@@ -3144,12 +3144,15 @@ function viewDuel(){
   let x=0,y=0;
   G.forEach(g=>{
    const ea=(da[d]||{})[g.id],eb=(db[d]||{})[g.id],ka=entryKey(g,ea),kb=entryKey(g,eb);
-   if(ka==null||kb==null)return;
+   if(ka==null&&kb==null)return;
+   if((ka==null||kb==null)&&g.active===false)return;
    const r=R.games[g.id]=R.games[g.id]||{a:0,b:0,t:0,na:[],nb:[]};
-   const na=num(ea.s),nb=num(eb.s);if(na!=null&&ea.w!==0)r.na.push(na);if(nb!=null&&eb.w!==0)r.nb.push(nb);
-   if(ka>kb){r.a++;R.a++;x++}else if(kb>ka){r.b++;R.b++;y++}else{r.t++;R.t++}
+   const na=ea?num(ea.s):null,nb=eb?num(eb.s):null;if(na!=null&&ea.w!==0)r.na.push(na);if(nb!=null&&eb.w!==0)r.nb.push(nb);
+   const va=ka==null?-Infinity:ka,vb=kb==null?-Infinity:kb;
+   if(ka==null&&kb!=null){r.b++;R.b++;y++}else if(kb==null&&ka!=null){r.a++;R.a++;x++}
+   else if(va>vb){r.a++;R.a++;x++}else if(vb>va){r.b++;R.b++;y++}else{r.t++;R.t++}
   });
-  if(G.some(g=>entryKey(g,(da[d]||{})[g.id])!=null&&entryKey(g,(db[d]||{})[g.id])!=null))R.days.push({d,x,y});
+  if(x+y>0||G.some(g=>entryKey(g,(da[d]||{})[g.id])!=null&&entryKey(g,(db[d]||{})[g.id])!=null))R.days.push({d,x,y});
  });
  const sa=summary(A.uid),sb=summary(opp),tot=R.a+R.b+R.t;
  const pa=tot?R.a/tot*100:50,pb=tot?R.b/tot*100:50;
@@ -3159,7 +3162,7 @@ function viewDuel(){
   <div class="tools" style="margin-top:8px">${[['week','Woche'],['month','Monat'],['7','7 Tage'],['30','30 Tage'],['90','90 Tage'],['all','Alles']].map(([k,l])=>`<button data-dper="${k}" class="${per===k?'on':''}">${l}</button>`).join('')}</div>
   <div class="paVs"><div><b>${R.a}</b><span>Du</span></div><div class="paVsMid">:</div><div><b>${R.b}</b><span>${esc(nickOf(opp))}</span></div></div>
   <div class="paVsBar"><u style="width:${pa}%"></u><u class="b" style="width:${pb}%"></u></div>
-  <div class="hint">${tot?`${tot} direkte Spiel-Vergleiche (gleiches Spiel am gleichen Tag)${R.t?`, ${R.t} Unentschieden`:''}.`:'Noch keine gemeinsamen Spiele in diesem Zeitraum.'}</div></div>`;
+  <div class="hint">${tot?`${tot} Spiel-Vergleiche (nicht gespielt = verloren, wenn der andere es gespielt hat)${R.t?`, ${R.t} Unentschieden`:''}.`:'Noch keine gemeinsamen Spiele in diesem Zeitraum.'}</div></div>`;
  h+=`<div class="card"><h2>Vergleich</h2><div class="paCmp">
   <div></div><div class="hint">Du</div><div class="hint">${esc(nickOf(opp))}</div>
   <div>Rating</div><div>${sa.rating==null?'–':Math.round(sa.rating)}</div><div>${sb.rating==null?'–':Math.round(sb.rating)}</div>
