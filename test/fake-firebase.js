@@ -19,6 +19,7 @@ function rule(path,op,data){
 function docRef(path){return{path,id:path.split('/').pop(),
  async get(){return snapDoc(path)},
  async set(d){rule(path,'set',d);const ex=S.docs[path]!==undefined;S.docs[path]=clone(d);emit(path,ex?'modified':'added')},
+ async update(d){const ex=S.docs[path];if(ex===undefined)throw err('not-found');S.docs[path]=Object.assign({},ex,clone(d));emit(path,'modified')},
  async delete(){const ex=S.docs[path]!==undefined;delete S.docs[path];if(ex)emit(path,'removed')},
  onSnapshot(cb,eb){const l={kind:'doc',path,cb};listeners.push(l);setTimeout(()=>cb(snapDoc(path)),0);return()=>{const i=listeners.indexOf(l);if(i>=0)listeners.splice(i,1)}}}}
 function colRef(path,filter){

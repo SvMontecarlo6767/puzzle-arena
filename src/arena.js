@@ -12,6 +12,7 @@ const FBCFG={
   appId:"1:818353954357:web:0e305c761bffc12d73db7c"
 };
 const EMOJIS=['👏','🔥','😮','😂','💀'];
+const DEFAULT_LINKS={ner:'https://nerdlegame.com',glo:'https://globle-game.com',tra:'https://travle.earth',tim:'https://timeguessr.com',kri:'https://krillion.io',satl:'https://satle.ca',rsq:'https://rangesqueeze.com',fla:'https://flagle-game.com/daily',geo:'https://geotrivia.com/de/georankle',hm:'https://howmanydaily.com',ff:'https://farflung.game',blf:'https://www.bluffer.lol/herald.html',mpt:'https://maptap.gg'};
 const TABS=[['me','🧩 Mein Tracker'],['board','🏆 Rangliste'],['rank','📅 Tagesranking'],['duel','⚔️ Duell'],['feed','💬 Feed'],['group','👥 Gruppe']];
 
 firebase.initializeApp(FBCFG);
@@ -20,7 +21,7 @@ window.__FS=fs;
 
 const A={user:null,uid:null,member:null,members:{},pubM:{},pubDays:{},pubSubs:{},pubReady:false,ver:{},cache:{},feed:[],
  tab:'me',booted:false,subs:[],rankDate:null,board:'rating',duel:{opp:null,per:'30'},profile:null,feedMine:false,threads:{},
- meDays:null,meDirty:true,pending:null,authMode:'login'};
+ links:{},meDays:null,meDirty:true,pending:null,authMode:'login'};
 
 const $g=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -33,6 +34,10 @@ const fmt=n=>n==null?'–':(+n.toFixed(1)).toLocaleString('de-DE');
 const nickOf=u=>(A.members[u]&&A.members[u].nick)||'Ehemalig';
 const poss=n=>/[sxzß]$/i.test(n)?n+'’':n+'s';
 const lk=()=>A.uid+':';
+const joinDate=u=>isoOf(new Date((A.members[u]&&A.members[u].joined)||0));
+function gameUrl(id){const u=(id in A.links)?A.links[id]:DEFAULT_LINKS[id];return /^https?:\/\//i.test(u||'')?u:''}
+function linkHTML(id){const u=gameUrl(id);return u?` <a class="paLink" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="Spiel öffnen">↗</a>`:''}
+window.__linkHTML=linkHTML;
 const medal=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':String(r);
 
 /* ============ Screens ============ */
@@ -160,6 +165,9 @@ function startListeners(){
   if(!m[A.uid]&&s.size&&!s.metadata.fromCache){showScreen('<div class="paAuth card"><h1>Hinweis</h1><div class="hint">Du bist nicht mehr Mitglied der Gruppe.</div><div style="margin-top:12px"><a href="#" data-a="logout">Abmelden</a></div></div>');return}
   syncPubSubs();renderBar();scheduleRender();
  },e=>console.warn('members',e)));
+ A.subs.push(fs.doc('groups/main').onSnapshot(g=>{if(!g.exists)return;const d=g.data()||{};A.groupAdmin=d.adminUid;A.links=d.links||{};
+  const ae=document.activeElement;if(typeof form==='function'&&!(ae&&ae.closest&&ae.closest('#form')))try{form()}catch(e){}
+  scheduleRender()},e=>console.warn('group',e)));
  const cut=ad(todayIso(),-120);
  A.subs.push(fs.collection('feed').where('date','>=',cut).onSnapshot(s=>{
   A.feed=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderBar();scheduleRender();
@@ -264,8 +272,13 @@ function valText(g,e){
  return (e.s!=null&&e.s!==''?e.s:'✓')+(e.hint?' 💡':'');
 }
 function boardFor(date,g){
- const arr=[];
- Object.keys(A.members).forEach(uid=>{const e=(daysOf(uid)[date]||{})[g.id],k=entryKey(g,e);if(k!=null)arr.push({uid,e,k})});
+ const arr=[],uids=Object.keys(A.members);
+ if(!uids.some(u=>entryKey(g,(daysOf(u)[date]||{})[g.id])!=null))return arr;
+ uids.forEach(uid=>{
+  const e=(daysOf(uid)[date]||{})[g.id],k=entryKey(g,e);
+  if(k!=null)arr.push({uid,e,k:k===-Infinity?-1e300:k,np:false});
+  else if(g.active!==false&&date>=joinDate(uid))arr.push({uid,e:null,k:-Infinity,np:true});
+ });
  arr.sort((a,b)=>a.k===b.k?0:(a.k>b.k?-1:1));
  arr.forEach(r=>{r.rank=1+arr.filter(x=>x.k>r.k).length});
  return arr;
@@ -275,7 +288,7 @@ function periodStats(from,to){
  for(let d=from;d<=to;d=ad(d,1)){
   G.forEach(g=>{
    const b=boardFor(d,g);if(b.length<2)return;
-   b.forEach(r=>{
+   b.filter(r=>!r.np).forEach(r=>{
     const worse=b.filter(x=>x.k<r.k).length,tie=b.filter(x=>x.k===r.k&&x!==r).length;
     out[r.uid].pts+=worse+tie*0.5;out[r.uid].games++;if(r.rank===1)out[r.uid].wins++;
    });
@@ -348,7 +361,7 @@ function viewBoard(){
   if(mode==='rating'&&r.s.rating==null)p.push('Rating nach '+Math.max(0,5-r.s.calib)+' weiteren kalibrierten Spielen');
   return p.join(' · ');
  };
- const labels={rating:['Rating','Gesamt-Rating über alle Puzzles'],form:['Tagesform','Ø Tagesform der letzten 7 gespielten Tage'],week:['Woche','Punkte = überholte Mitspieler pro Spiel und Tag (Mo–heute)'],month:['Monat','Punkte = überholte Mitspieler pro Spiel und Tag (dieser Monat)'],streak:['Streak','Aufeinanderfolgende Tage mit mindestens einem Eintrag']};
+ const labels={rating:['Rating','Gesamt-Rating über alle Puzzles'],form:['Tagesform','Ø Tagesform der letzten 7 gespielten Tage'],week:['Woche','Punkte = überholte Mitspieler pro Spiel und Tag, nicht gespielt = Letzter (Mo–heute)'],month:['Monat','Punkte = überholte Mitspieler pro Spiel und Tag, nicht gespielt = Letzter (dieser Monat)'],streak:['Streak','Aufeinanderfolgende Tage mit mindestens einem Eintrag']};
  let h=`<div class="card"><h2>Rangliste<small>${esc(labels[mode][1])}</small></h2>
   <div class="tools">${Object.keys(labels).map(k=>`<button data-board="${k}" class="${mode===k?'on':''}">${labels[k][0]}</button>`).join('')}</div>`;
  h+=rows.map((r,i)=>`<div class="paRow paClick ${r.uid===A.uid?'me':''}" data-prof="${r.uid}">
@@ -411,8 +424,10 @@ function viewRank(){
  let any=false;
  G.forEach(g=>{
   const b=boardFor(d,g);if(!b.length)return;any=true;
-  h+=`<div class="card"><h2>${esc(g.n)}<small>${b.length} ${b.length===1?'Eintrag':'Einträge'}</small></h2>`+
-   b.map(r=>`<div class="paRowW ${r.uid===A.uid?'me':''}"><div class="paRow"><div class="paRk">${medal(r.rank)}</div>
+  h+=`<div class="card"><h2>${esc(g.n)}${linkHTML(g.id)}<small>${b.filter(r=>!r.np).length} gespielt</small></h2>`+
+   b.map(r=>r.np?`<div class="paRowW ${r.uid===A.uid?'me':''}"><div class="paRow"><div class="paRk">–</div>
+     <div class="paMain"><div class="paNm">${esc(nickOf(r.uid))}${r.uid===A.uid?' <small>(du)</small>':''}</div></div>
+     <div class="paBig sm hint">nicht gespielt</div></div></div>`:`<div class="paRowW ${r.uid===A.uid?'me':''}"><div class="paRow"><div class="paRk">${medal(r.rank)}</div>
      <div class="paMain"><div class="paNm">${esc(nickOf(r.uid))}${r.uid===A.uid?' <small>(du)</small>':''}</div></div>
      <div class="paBig sm">${esc(valText(g,r.e))}</div></div>${reactionBar(r.uid,d,g)}</div>`).join('')+'</div>';
  });
@@ -434,6 +449,7 @@ function viewDuel(){
   G.forEach(g=>{
    const ea=(da[d]||{})[g.id],eb=(db[d]||{})[g.id],ka=entryKey(g,ea),kb=entryKey(g,eb);
    if(ka==null&&kb==null)return;
+   if((ka==null&&d<joinDate(A.uid))||(kb==null&&d<joinDate(opp)))return;
    if((ka==null||kb==null)&&g.active===false)return;
    const r=R.games[g.id]=R.games[g.id]||{a:0,b:0,t:0,na:[],nb:[]};
    const na=ea?num(ea.s):null,nb=eb?num(eb.s):null;if(na!=null&&ea.w!==0)r.na.push(na);if(nb!=null&&eb.w!==0)r.nb.push(nb);
@@ -460,7 +476,7 @@ function viewDuel(){
   <div>Tage gespielt</div><div>${sa.dates.length}</div><div>${sb.dates.length}</div></div></div>`;
  const gl=G.filter(g=>R.games[g.id]);
  if(gl.length)h+=`<div class="card"><h2>Je Spiel</h2><div class="scroll"><table class="paTbl"><tr><th>Spiel</th><th>Du</th><th>=</th><th>${esc(nickOf(opp))}</th><th>Ø Du</th><th>Ø ${esc(nickOf(opp))}</th></tr>`+
-  gl.map(g=>{const r=R.games[g.id];return `<tr><td>${esc(g.n)}</td><td class="${r.a>r.b?'paW':''}">${r.a}</td><td>${r.t}</td><td class="${r.b>r.a?'paW':''}">${r.b}</td><td>${avg(r.na)}</td><td>${avg(r.nb)}</td></tr>`}).join('')+'</table></div></div>';
+  gl.map(g=>{const r=R.games[g.id];return `<tr><td>${esc(g.n)}${linkHTML(g.id)}</td><td class="${r.a>r.b?'paW':''}">${r.a}</td><td>${r.t}</td><td class="${r.b>r.a?'paW':''}">${r.b}</td><td>${avg(r.na)}</td><td>${avg(r.nb)}</td></tr>`}).join('')+'</table></div></div>';
  const last=R.days.slice(-10).reverse();
  if(last.length)h+=`<div class="card"><h2>Letzte gemeinsame Tage</h2>`+last.map(x=>`<div class="paRow"><div class="paMain">${fd(x.d)}</div><div class="paBig sm ${x.x>x.y?'paW':''}">${x.x} : ${x.y}</div></div>`).join('')+'</div>';
  return h;
@@ -491,6 +507,7 @@ function viewGroup(){
   <label class="hint">Spitzname</label><div class="paCin"><input id="paNickEdit" maxlength="20" value="${esc(nickOf(A.uid))}"><button data-savenick>Speichern</button></div>
   <button data-logout style="margin-top:12px">Abmelden</button>
   <div class="hint paMsg" id="paAccMsg"></div></div>`;
+ if(isAdmin)h+=`<div class="card"><h2>Spiel-Links<small>für alle sichtbar</small></h2><div class="hint" style="margin-bottom:8px">Adresse leer lassen = kein Link.</div>${GA.map(g=>`<div class="paLinkRow"><span>${esc(g.n)}</span><input data-linkid="${g.id}" placeholder="https://…" value="${esc(gameUrl(g.id))}"></div>`).join('')}<button data-savelinks style="margin-top:8px">Links speichern</button><div class="hint paMsg" id="paLinkMsg"></div></div>`;
  h+='<div class="card hint">🔒 Deine Freunde sehen nur Ergebnisse und Statistiken. Notizen, Lösungs-Album und Weltkarte bleiben privat.</div>';
  return h;
 }
@@ -518,6 +535,13 @@ document.addEventListener('click',async ev=>{
   const u=b.dataset.kick;if(confirm(nickOf(u)+' wirklich aus der Gruppe entfernen?'))try{await fs.doc('members/'+u).delete()}catch(e){alert(authErr(e))}
   return}
  if(t.closest('[data-copycode]')){const c=(A.member&&A.member.code)||'';try{await navigator.clipboard.writeText(c)}catch(e){prompt('Code kopieren:',c)}return}
+ if(t.closest('[data-savelinks]')){
+  const m=$g('paLinkMsg'),map={};let bad='';
+  document.querySelectorAll('[data-linkid]').forEach(i=>{const id=i.dataset.linkid;let v=i.value.trim();if(v&&!/^https?:\/\//i.test(v)){if(/^[\w.-]+\.[a-z]{2,}/i.test(v))v='https://'+v;else bad=id}
+   const def=DEFAULT_LINKS[id]||'';if(v!==def)map[id]=v});
+  if(bad){m.textContent='Ungültige Adresse bei: '+bad;return}
+  try{await fs.doc('groups/main').update({links:map});m.textContent='Gespeichert ✓'}catch(e){m.textContent=authErr(e)}
+  return}
  if(t.closest('[data-logout]')){doLogout();return}
  if(t.closest('[data-savenick]')){
   const v=$g('paNickEdit').value.trim(),m=$g('paAccMsg');
@@ -541,10 +565,23 @@ async function sendComment(key){
  try{await fs.collection('feed').add({kind:'c',from:A.uid,nick:nickOf(A.uid),to,date,gid,emoji:'',text,ts:Date.now()})}catch(e){console.warn(e);inp.value=text}
 }
 
-/* Admin-Erkennung (Gruppe lesen) */
-auth.onAuthStateChanged(async u=>{
- if(!u)return;
- try{const g=await fs.doc('groups/main').get();if(g.exists){A.groupAdmin=g.data().adminUid;if(A.tab==='group')renderView()}}catch(e){}
+/* ============ Tag aus dem Artefakt importieren ============ */
+function importDay(raw){
+ let o;try{o=JSON.parse(raw)}catch(e){throw new Error('Das ist kein gültiger Export.')}
+ const list=Array.isArray(o)?o:[o];
+ if(!list.length||!list.every(x=>x&&x.pa==='day'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&x.day&&typeof x.day==='object'))throw new Error('Das ist kein Tages-Export aus dem Artefakt.');
+ list.forEach(x=>{D[x.date]=Object.assign(JSON.parse(JSON.stringify(D[x.date]||{})),JSON.parse(JSON.stringify(x.day)));if(!Object.keys(D[x.date]).length)delete D[x.date]});
+ mig();save(list.map(x=>x.date));
+ cur=list[list.length-1].date;const di=document.getElementById('date');if(di)di.value=cur;
+ form();render();
+ return list.map(x=>fd(x.date)).join(', ');
+}
+document.addEventListener('click',ev=>{
+ const b=ev.target.closest&&ev.target.closest('#paImpBtn');if(!b)return;
+ const ta=document.getElementById('paImpTxt'),m=document.getElementById('paImpMsg');
+ try{const r=importDay(ta.value.trim());ta.value='';m.className='hint paMsg ok';m.textContent='Importiert: '+r+' ✓'}
+ catch(e){m.className='hint paMsg';m.textContent=e.message}
 });
+
 window.Arena=A;
 })();

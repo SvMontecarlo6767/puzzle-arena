@@ -29,12 +29,18 @@ js = sub1(r"lastLocal=new Date\(\);return true\}", "lastLocal=new Date();window.
 js = sub1(r"const dn=await claude\.use\('downloads'\);if\(!dn\)throw 0;await dn\.save\(\{filename:([^,]+),data:t\}\);",
           r"dlFile(\1,t);", js, count=2)
 js = "function dlFile(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:name.endsWith('.csv')?'text/csv':'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}\n" + js
+js = sub1(r'<div class="nm">\$\{g\.n\}</div>', '<div class="nm">${g.n}${window.__linkHTML?window.__linkHTML(g.id):\'\'}</div>', js)
 assert '</script' not in js.lower()
 
 # 3) Kopf
 head = head.replace('<title>Puzzle-Tracker</title>', '<title>Puzzle Arena</title>')
 head = head.replace('<meta charset="utf-8">', '<meta charset="utf-8"><meta name="robots" content="noindex">')
 sdk = ''.join(f'<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-{n}-compat.js"></script>' for n in ('app', 'auth', 'firestore'))
+
+# Import-Karte (Tag aus dem Artefakt)
+imp = '<div class="card" id="paImpCard"><h2>Tag aus dem Artefakt importieren<small>Export im Artefakt kopieren, hier einfügen</small></h2><textarea id="paImpTxt" rows="2" placeholder="Hier den kopierten Tages-Export einfügen …"></textarea><button id="paImpBtn" style="margin-top:8px">📥 Importieren</button><div class="hint paMsg" id="paImpMsg"></div></div>\n'
+assert markup.count('<div class="card" id="badgesCard">') == 1
+markup = markup.replace('<div class="card" id="badgesCard">', imp + '<div class="card" id="badgesCard">')
 
 # 4) Zusammenbauen
 out = (head + css + '\n' + arena_css + mid + sdk +

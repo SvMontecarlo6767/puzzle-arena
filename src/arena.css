@@ -34,3 +34,5 @@
 .paFeedI{padding:9px 2px;border-top:1px solid var(--bd);font-size:14px}.paQuote{margin-top:3px;padding:4px 10px;border-left:3px solid var(--ac);color:var(--mu)}
 .paCode{font:700 26px/1.2 ui-monospace,Menlo,monospace;letter-spacing:3px;margin:6px 0;user-select:all}
 select{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:9px 10px;font:inherit;color:var(--tx)}
+.paLink{font-size:13px;text-decoration:none;color:var(--ac);border:1px solid var(--bd);border-radius:8px;padding:0 6px;margin-left:6px;font-weight:600}
+.paLinkRow{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;margin:4px 0;font-size:13px}
