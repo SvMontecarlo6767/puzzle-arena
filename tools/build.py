@@ -42,6 +42,10 @@ imp = '<div class="card" id="paImpCard"><h2>Tag aus dem Artefakt importieren<sma
 assert markup.count('<div class="card" id="badgesCard">') == 1
 markup = markup.replace('<div class="card" id="badgesCard">', imp + '<div class="card" id="badgesCard">')
 
+anchor = '<h3 style="margin-top:12px">Notiz zum Tag</h3>'
+assert markup.count(anchor) == 1
+markup = markup.replace(anchor, '<div class="tools" style="margin-top:8px"><button id="paDayClear" style="color:var(--bad)">🗑️ Alle Einträge dieses Tages löschen</button></div>\n  ' + anchor)
+
 # 4) Zusammenbauen
 out = (head + css + '\n' + arena_css + mid + sdk +
   '\n<div id="paScreen"></div>\n<div id="paApp" hidden><div id="paBar"></div>\n<div id="trackerView">\n' + markup +

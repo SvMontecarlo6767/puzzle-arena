@@ -583,5 +583,12 @@ document.addEventListener('click',ev=>{
  catch(e){m.className='hint paMsg';m.textContent=e.message}
 });
 
+document.addEventListener('click',ev=>{
+ const b=ev.target.closest&&ev.target.closest('#paDayClear');if(!b)return;
+ const day=D[cur],n=day?Object.keys(day).length:0;
+ if(!n){alert('Am '+fd(cur)+' ist nichts eingetragen.');return}
+ if(!confirm('Wirklich ALLE Einträge (und die Notiz) vom '+fd(cur)+' löschen? Auch deine Freunde sehen sie dann nicht mehr.'))return;
+ delete D[cur];save([cur]);form();render();
+});
 window.Arena=A;
 })();
