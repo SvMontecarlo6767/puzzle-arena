@@ -12,7 +12,7 @@ const FBCFG={
   appId:"1:818353954357:web:0e305c761bffc12d73db7c"
 };
 const EMOJIS=['👏','🔥','😮','😂','💀'];
-const DEFAULT_LINKS={ner:'https://nerdlegame.com',glo:'https://globle-game.com',tra:'https://travle.earth',tim:'https://timeguessr.com',kri:'https://krillion.io',satl:'https://satle.ca',rsq:'https://rangesqueeze.com',fla:'https://flagle-game.com/daily',geo:'https://geotrivia.com/de/georankle',hm:'https://howmanydaily.com',ff:'https://farflung.game',blf:'https://www.bluffer.lol/herald.html',mpt:'https://maptap.gg'};
+const DEFAULT_LINKS={ner:'https://nerdlegame.com',glo:'https://globle-game.com',tra:'https://travle.earth',tim:'https://timeguessr.com',kri:'https://krillion.io',satl:'https://satle.ca',rsq:'https://rangesqueeze.com',fla:'https://flagle-game.com/daily',geo:'https://geotrivia.com/de/georankle',hm:'https://howmanydaily.com',ff:'https://farflung.game',blf:'https://www.bluffer.lol/herald.html',mpt:'https://maptap.gg',szw:'https://www.sueddeutsche.de/raetsel/wordle/aktuell?reduced=true'};
 const TABS=[['me','🧩 Mein Tracker'],['board','🏆 Rangliste'],['rank','📅 Tagesranking'],['games','🎮 Spiele'],['games','🎮 Spiele'],['duel','⚔️ Duell'],['feed','💬 Feed'],['group','👥 Gruppe']];
 
 firebase.initializeApp(FBCFG);
@@ -38,6 +38,16 @@ const joinDate=u=>isoOf(new Date((A.members[u]&&A.members[u].joined)||0));
 function gameUrl(id){const u=(id in A.links)?A.links[id]:DEFAULT_LINKS[id];return /^https?:\/\//i.test(u||'')?u:''}
 function linkHTML(id){const u=gameUrl(id);return u?` <a class="paLink" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="Spiel öffnen">↗</a>`:''}
 window.__linkHTML=linkHTML;
+/* Reihenfolge der Eingabefelder: Admin (Momo) behält die Standard-Reihenfolge, alle anderen bekommen eine feste, persönliche Reihenfolge */
+function seededOrder(arr,seed){
+ let h=2166136261;for(const ch of seed){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
+ const rnd=()=>{h+=0x6D2B79F5;let t=h;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296};
+ const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a;
+}
+window.__order=arr=>{
+ const momo=(A.user&&(A.user.email||'').toLowerCase()===ADMIN_EMAIL)||(A.uid&&A.uid===A.groupAdmin);
+ return momo||!A.uid?arr:seededOrder(arr,A.uid);
+};
 const medal=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':String(r);
 
 /* ============ Screens ============ */

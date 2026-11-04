@@ -413,7 +413,8 @@ const G=[
  {id:'hm',n:'How Many?!',h:'Punkte (5 Fragen à max. 1000, gesamt max. 5000) · seit 01.11.2026 getrackt',dir:'high',win:0,max:5000},
  {id:'ff',n:'Farflung',h:'Punkte (5 Fragen à max. 100, gesamt max. 500) · seit 01.11.2026 getrackt',dir:'high',win:0,max:500},
  {id:'blf',n:'Bluffer Herald',h:'Punkte (Wette: Treffer +150, Extra +25, Fehlende −150, 💎 +100; kann negativ sein) · seit 01.11.2026 getrackt',dir:'high',win:0},
- {id:'mpt',n:'MapTap',h:'Punkte (5 Runden, gewichtet, max. 1000) · seit 03.11.2026 getrackt',dir:'high',win:0,max:1000}
+ {id:'mpt',n:'MapTap',h:'Punkte (5 Runden, gewichtet, max. 1000) · seit 03.11.2026 getrackt',dir:'high',win:0,max:1000},
+ {id:'szw',n:'SZ Wordle',h:'Versuche (1–6) · seit 04.11.2026 getrackt',dir:'low',win:1,max:6}
 ];
 const HINT_PENALTY=2;
 const GA=G.filter(g=>g.active!==false);
@@ -1369,7 +1370,7 @@ function dopTableValue(g,n){
   case 'era':return n>=600?100:n>=450?50:n>=300?25:n>=150?5:n>=50?-10:-20;
   case 'noi':return n>=2150?100:n>=1600?50:n>=1075?25:n>=535?5:n>=180?-10:-20;
   case 'rsq':return n>=600?100:n>=450?50:n>=300?25:n>=150?5:n>=50?-10:-20;
-  case 'fla':return n===1?100:n===2?50:n===3?25:n===4?12:n===5?-10:-20;
+  case 'fla':case 'szw':return n===1?100:n===2?50:n===3?25:n===4?12:n===5?-10:-20;
   case 'geo':return n>=600?100:n>=450?50:n>=300?25:n>=150?5:n>=50?-10:-20;
   case 'hm':return n>=4300?100:n>=3200?50:n>=2150?25:n>=1070?5:n>=360?-10:-20;
   case 'ff':return n>=430?100:n>=320?50:n>=215?25:n>=107?5:n>=36?-10:-20;

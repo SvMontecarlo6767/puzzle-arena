@@ -30,6 +30,7 @@ js = sub1(r"const dn=await claude\.use\('downloads'\);if\(!dn\)throw 0;await dn\
           r"dlFile(\1,t);", js, count=2)
 js = "function dlFile(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:name.endsWith('.csv')?'text/csv':'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}\n" + js
 js = sub1(r'<div class="nm">\$\{g\.n\}</div>', '<div class="nm">${g.n}${window.__linkHTML?window.__linkHTML(g.id):\'\'}</div>', js)
+js = sub1(r"\$\('form'\)\.innerHTML=GA\.map\(", "$('form').innerHTML=(window.__order?window.__order(GA):GA).map(", js)
 assert '</script' not in js.lower()
 
 # 3) Kopf
