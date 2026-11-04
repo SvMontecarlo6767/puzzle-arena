@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMember() {
+      return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid));
+    }
+    function groupData() { return get(/databases/$(database)/documents/groups/main).data; }
+    function isAdmin() { return signedIn() && groupData().adminUid == request.auth.uid; }
+    function isAdminEmail() { return signedIn() && request.auth.token.email == 'momo.haskamp@gmail.com'; }
+    function nickOk(n) { return n is string && n.size() >= 2 && n.size() <= 20; }
+
+    // Private Daten (Tracker 1:1: Einträge, Notizen, Lösungs-Album, Meilensteine …) – nur der Besitzer
+    match /users/{uid}/{document=**} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Gruppe: Einladungscode nur für Mitglieder (und den Admin beim Anlegen) lesbar
+    match /groups/main {
+      allow get: if isMember() || isAdminEmail();
+      allow create: if isAdminEmail() && request.resource.data.adminUid == request.auth.uid;
+      allow update: if isAdmin();
+    }
+
+    // Mitglieder: Beitritt nur mit richtigem Einladungscode
+    match /members/{uid} {
+      allow read: if isMember();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nick', 'code', 'joined'])
+        && nickOk(request.resource.data.nick)
+        && request.resource.data.code == groupData().code;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nick', 'code', 'joined'])
+        && nickOk(request.resource.data.nick)
+        && request.resource.data.code == resource.data.code;
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+    }
+
+    // Öffentliche Ergebnisse (nur Score/✓/✗/Tipp je Spiel und Tag – KEINE Notizen, Lösungen, Karte)
+    match /pub/{uid}/months/{month} {
+      allow read: if isMember();
+      allow write: if isMember() && request.auth.uid == uid;
+    }
+
+    // Reaktionen & Kommentare
+    match /feed/{id} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.keys().hasOnly(['kind', 'from', 'nick', 'to', 'date', 'gid', 'emoji', 'text', 'ts'])
+        && request.resource.data.text is string && request.resource.data.text.size() <= 300;
+      allow delete: if isMember() && (resource.data.from == request.auth.uid || isAdmin());
+    }
+  }
+}

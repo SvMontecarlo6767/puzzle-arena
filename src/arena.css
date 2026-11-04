@@ -1,0 +1,36 @@
+#paApp[hidden]{display:none}
+.paAuth{max-width:400px;margin:8vh auto 0}
+.paAuth label{display:block;font-size:12.5px;color:var(--mu);margin:10px 0 4px}
+.paBtn{width:100%;margin-top:14px;background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.paMsg{margin-top:10px;font-size:13px;color:var(--bad);min-height:1em}.paMsg.ok{color:var(--ac)}
+.paTop{display:flex;justify-content:space-between;align-items:center;max-width:760px;margin:0 auto 8px}
+.paWho{color:var(--mu);font-size:13px}
+.paTabs{display:flex;gap:6px;overflow-x:auto;max-width:760px;margin:0 auto 14px;padding-bottom:4px;position:sticky;top:0;z-index:5;background:var(--bg);padding-top:4px}
+.paTabs button{white-space:nowrap;flex:none}
+.paTabs button.on,.tools button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.paBadge{background:var(--bad);color:#fff;border-radius:9px;padding:0 6px;font-size:11px}
+#paView{max-width:760px;margin:0 auto}
+.paRow{display:flex;align-items:center;gap:10px;padding:9px 6px;border-top:1px solid var(--bd)}
+.paRow:first-of-type{border-top:0}
+.paRow.me,.paRowW.me{background:var(--ac2);border-radius:10px}
+.paClick{cursor:pointer}
+.paRk{width:30px;text-align:center;font-size:18px;flex:none}
+.paMain{flex:1;min-width:0}.paNm{font-weight:600;overflow:hidden;text-overflow:ellipsis}.paNm small{color:var(--mu);font-weight:400}
+.paBig{font-size:20px;font-weight:700;flex:none}.paBig.sm{font-size:16px}
+.paLg{color:#fff;border-radius:8px;padding:1px 7px;font-size:11px;font-weight:600;vertical-align:middle}
+.paReact{display:flex;gap:5px;flex-wrap:wrap;padding:0 6px 8px 46px}
+.paEm{padding:3px 9px;border-radius:14px;font-size:14px}.paEm.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.paThread{padding:0 10px 10px 46px}.paCm{font-size:13.5px;margin:4px 0}
+.paCin{display:flex;gap:6px;margin-top:6px}.paCin button{flex:none}
+.paSm{padding:4px 10px;font-size:12px}
+.paSpark{width:100%;height:60px}
+.paAct{display:grid;grid-template-columns:repeat(14,1fr);gap:3px}.paAct i{aspect-ratio:1;border-radius:3px;background:var(--bd);display:block}
+.paTbl{width:100%;border-collapse:collapse;font-size:13px}.paTbl th{text-align:left;color:var(--mu);font-weight:600}.paTbl td,.paTbl th{padding:5px 6px;border-top:1px solid var(--bd)}
+.paW{font-weight:700;color:var(--ac)}
+.paVs{display:flex;justify-content:center;align-items:center;gap:18px;margin:14px 0 8px;text-align:center}
+.paVs b{display:block;font-size:34px}.paVs span{font-size:12.5px;color:var(--mu)}.paVsMid{font-size:28px;color:var(--mu)}
+.paVsBar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bd);margin-bottom:6px}.paVsBar u{display:block;background:var(--ac)}.paVsBar u.b{background:#c98a2b}
+.paCmp{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px 10px;font-size:14px}
+.paFeedI{padding:9px 2px;border-top:1px solid var(--bd);font-size:14px}.paQuote{margin-top:3px;padding:4px 10px;border-left:3px solid var(--ac);color:var(--mu)}
+.paCode{font:700 26px/1.2 ui-monospace,Menlo,monospace;letter-spacing:3px;margin:6px 0;user-select:all}
+select{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:9px 10px;font:inherit;color:var(--tx)}
