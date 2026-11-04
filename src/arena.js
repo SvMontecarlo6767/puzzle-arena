@@ -340,63 +340,57 @@ function leagueBadge(r){
 }
 function viewBoard(){
  const t=todayIso(),uids=Object.keys(A.members);
- const wk=periodStats(mondayOf(t),t),mo=periodStats(t.slice(0,8)+'01',t);
- const rows=uids.map(uid=>{const s=summary(uid);return{uid,s,wk:wk[uid],mo:mo[uid],form:avgLast(s.dp,7)}});
+ if(!['week','month','all'].includes(A.board))A.board='week';
  const mode=A.board;
- const key={rating:r=>r.s.rating,form:r=>r.form,week:r=>r.wk.pts,month:r=>r.mo.pts,streak:r=>r.s.streak.cur}[mode];
- rows.sort((a,b)=>{const x=key(a),y=key(b);return (y==null?-1e9:y)-(x==null?-1e9:x)});
- const main=r=>{
-  if(mode==='rating')return r.s.rating==null?'–':Math.round(r.s.rating);
-  if(mode==='form')return r.form==null?'–':fmt(r.form)+' %';
-  if(mode==='week')return fmt(r.wk.pts);
-  if(mode==='month')return fmt(r.mo.pts);
-  return r.s.streak.cur+' 🔥';
- };
- const sub=r=>{
-  const p=[];
-  if(mode!=='rating')p.push('Rating '+(r.s.rating==null?'–':Math.round(r.s.rating)));
-  if(mode!=='form')p.push('Form 7T '+(r.form==null?'–':fmt(r.form)+' %'));
-  if(mode==='week'||mode==='month'){const x=mode==='week'?r.wk:r.mo;p.push(x.wins+' Tagessiege')}
-  if(mode!=='streak')p.push('Streak '+r.s.streak.cur);
-  if(mode==='rating'&&r.s.rating==null)p.push('Rating nach '+Math.max(0,5-r.s.calib)+' weiteren kalibrierten Spielen');
-  return p.join(' · ');
- };
- const labels={rating:['Rating','Gesamt-Rating über alle Puzzles'],form:['Tagesform','Ø Tagesform der letzten 7 gespielten Tage'],week:['Woche','Punkte = überholte Mitspieler pro Spiel und Tag, nicht gespielt = Letzter (Mo–heute)'],month:['Monat','Punkte = überholte Mitspieler pro Spiel und Tag, nicht gespielt = Letzter (dieser Monat)'],streak:['Streak','Aufeinanderfolgende Tage mit mindestens einem Eintrag']};
- let h=`<div class="card"><h2>Rangliste<small>${esc(labels[mode][1])}</small></h2>
-  <div class="tools">${Object.keys(labels).map(k=>`<button data-board="${k}" class="${mode===k?'on':''}">${labels[k][0]}</button>`).join('')}</div>`;
+ let first=t;uids.forEach(u=>{const k=Object.keys(daysOf(u)).sort()[0];if(k&&k<first)first=k});
+ const from={week:mondayOf(t),month:t.slice(0,8)+'01',all:first}[mode];
+ const ps=periodStats(from,t);
+ const rows=uids.map(uid=>({uid,x:ps[uid]})).sort((a,b)=>b.x.pts-a.x.pts||b.x.wins-a.x.wins);
+ const info={week:'Mo bis heute',month:'dieser Monat',all:'seit dem ersten Eintrag'}[mode];
+ let h=`<div class="card"><h2>Rangliste<small>${info}</small></h2>
+  <div class="tools"><button data-board="week" class="${mode==='week'?'on':''}">Woche</button><button data-board="month" class="${mode==='month'?'on':''}">Monat</button><button data-board="all" class="${mode==='all'?'on':''}">Gesamt</button></div>
+  <div class="hint" style="margin-bottom:6px">Punkte: pro Spiel und Tag 1 Punkt für jeden Mitspieler, den du schlägst (Gleichstand 0,5). Nicht gespielt = Letzter, ohne Punkte.</div>`;
  h+=rows.map((r,i)=>`<div class="paRow paClick ${r.uid===A.uid?'me':''}" data-prof="${r.uid}">
    <div class="paRk">${medal(i+1)}</div>
-   <div class="paMain"><div class="paNm">${esc(nickOf(r.uid))}${r.uid===A.uid?' <small>(du)</small>':''} ${leagueBadge(r.s.rating)}</div><div class="hint">${esc(sub(r))}</div></div>
-   <div class="paBig">${main(r)}</div></div>`).join('');
+   <div class="paMain"><div class="paNm">${esc(nickOf(r.uid))}${r.uid===A.uid?' <small>(du)</small>':''}</div><div class="hint">${r.x.wins} Tagessiege · ${r.x.games} gespielte Wertungen</div></div>
+   <div class="paBig">${fmt(r.x.pts)}</div></div>`).join('');
  h+='</div>';
  if(A.profile&&A.members[A.profile])h+=profileHTML(A.profile);
- else h+='<div class="hint" style="margin:0 4px 12px">Tippe auf einen Namen für das Profil.</div>';
+ else h+='<div class="hint" style="margin:0 4px 12px">Tippe auf einen Namen, um das Dashboard zu sehen.</div>';
  return h;
 }
 function profileHTML(uid){
- const s=summary(uid),nick=nickOf(uid);
- const chips=[
-  [s.rating==null?'–':Math.round(s.rating),'Rating'],
-  [fmt(avgLast(s.dp,Object.keys(s.dp).length)),'Ø Tagesform %'],
-  [fmt(avgLast(s.dp,7)),'Form 7 Tage %'],
-  [s.streak.cur,'Streak aktuell'],[s.streak.best,'Streak Rekord'],[s.dates.length,'Tage gespielt']
- ];
- const rowsG=G.filter(g=>s.gs[g.id].played>0).map(g=>{const x=s.gs[g.id];
-  return `<tr><td>${esc(g.n)}${g.active===false?' <small>(inaktiv)</small>':''}</td><td>${x.played}</td><td>${fmt(x.avg)}</td><td>${fmt(x.bt)}</td><td>${x.rate==null?'–':Math.round(x.rate*100)+' %'}</td><td>${x.rating==null?'–':Math.round(x.rating)}</td></tr>`}).join('');
- const days=[];for(let i=27;i>=0;i--)days.push(ad(todayIso(),-i));
- const dd=daysOf(uid);
- const act=days.map(d=>{const n=dd[d]?Object.keys(dd[d]).length:0;const o=n?Math.min(1,.25+n*.1):0;
-  return `<i title="${fd(d)}: ${n} Spiele" style="${n?`background:var(--ac);opacity:${o}`:''}"></i>`}).join('');
- let spark='';
- if(s.series.length>1){
-  const pts=s.series.slice(-60).map(p=>p.overall),mn=Math.min(...pts),mx=Math.max(...pts),sp=(mx-mn)||1,W=300,H=60;
-  spark=`<svg viewBox="0 0 ${W} ${H}" class="paSpark"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="${pts.map((v,i)=>`${(2+i*(W-4)/(pts.length-1)).toFixed(1)},${(H-4-(v-mn)*(H-8)/sp).toFixed(1)}`).join(' ')}"/></svg>`;
- }
- return `<div class="card"><h2>Profil: ${esc(nick)} ${leagueBadge(s.rating)}<small>nur Ergebnisse & Statistiken</small></h2>
-  <div class="chips">${chips.map(c=>`<div class="chip"><b>${c[0]}</b><span>${c[1]}</span></div>`).join('')}</div>
-  ${spark?`<h3>Rating-Verlauf</h3>${spark}`:''}
-  <h3>Aktivität (letzte 28 Tage)</h3><div class="paAct">${act}</div>
-  <h3>Spiele</h3><div class="scroll"><table class="paTbl"><tr><th>Spiel</th><th>Gesp.</th><th>Ø</th><th>Best</th><th>Quote</th><th>Rating</th></tr>${rowsG||'<tr><td colspan="6" class="hint">Noch keine Einträge.</td></tr>'}</table></div></div>`;
+ const t=todayIso(),all=daysOf(uid),hist={};
+ Object.keys(all).forEach(d=>{if(d<t)hist[d]=all[d]});
+ const nick=nickOf(uid);
+ const body=withData(hist,()=>{
+  const days=Object.keys(D).sort();
+  if(!days.length)return '<div class="hint">Noch keine Historie (heutige Einträge sind verborgen).</div>';
+  const ST=G.map(g=>[g,stats(g)]);
+  let played=0,wins=0,wp=0;ST.forEach(([g,s])=>{played+=s.played;if(g.win){wins+=s.wins;wp+=s.played}});
+  const full=days.filter(d=>GA.every(g=>D[d][g.id])).length;
+  const st=streakOf(days);
+  const per={};GA.forEach(g=>{per[g.id]=gameRatingSeries(g)});
+  const tl=overallTimeline(per),last=tl.overallSeries[tl.overallSeries.length-1];
+  const dp=dayStats(),avgAll=dp.length?dp.reduce((a,b)=>a+b.p,0)/dp.length:null;
+  const l7=dp.slice(-7),f7=l7.length?l7.reduce((a,b)=>a+b.p,0)/l7.length:null;
+  const bestDay=dp.length?dp.reduce((a,b)=>b.p>a.p?b:a):null;
+  let h=`<div class="chips">${chip(days.length,'Tage erfasst')+chip(st.best,'Längste Serie')+chip(played,'Puzzles gespielt')+chip(wp?Math.round(wins/wp*100)+' %':'–','Siegquote')+chip(full,'Komplette Tage')+chip(last?Math.round(last.overall):'–','Rating')}</div>`;
+  if(tl.overallSeries.length>1){
+   const pts=tl.overallSeries.slice(-60).map(p=>p.overall),mn=Math.min(...pts),mx=Math.max(...pts),sp=(mx-mn)||1,W=300,H=60;
+   h+=`<h3>Rating-Verlauf ${last?`<span class="paLg" style="background:${TIERS[leagueOfRating(last.overall)].c}">${TIERS[leagueOfRating(last.overall)].n}</span>`:''}</h3><svg viewBox="0 0 ${W} ${H}" class="paSpark"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="${pts.map((v,i)=>`${(2+i*(W-4)/(pts.length-1)).toFixed(1)},${(H-4-(v-mn)*(H-8)/sp).toFixed(1)}`).join(' ')}"/></svg>`;
+  }
+  h+=`<h3>Tagesform</h3><div class="chips">${chip(fmt(avgAll),'Ø aller Tage')+chip(fmt(f7),'Ø 7 Tage')+chip(bestDay?fd(bestDay.d)+' ('+fmt(bestDay.p)+')':'–','Bester Tag')}</div>${dayLine(dp)}`;
+  h+=`<h3>Form aktuell</h3>${radarChart()}<h3>Wochentage</h3>${weekdayBars()}`;
+  const dd=[];for(let i=27;i>=0;i--)dd.push(ad(t,-i));
+  h+=`<h3>Aktivität (letzte 28 Tage, ohne heute)</h3><div class="paAct">${dd.map(d=>{const n=D[d]?Object.keys(D[d]).length:0;return `<i title="${fd(d)}: ${n} Spiele" style="${n?`background:var(--ac);opacity:${Math.min(1,.25+n*.1)}`:''}"></i>`}).join('')}</div>`;
+  return h+'@@GAMES@@'+ST.filter(([g,s])=>s.played>0).map(([g,s])=>{
+   const rec=records().find(r=>r[0].id===g.id);
+   return `<div class="paGame"><h3>${esc(g.n)}${linkHTML(g.id)}${g.active===false?' <small>(inaktiv)</small>':''}</h3>
+   <div class="chips">${chip(s.played,'Gespielt')+chip(fmt(s.avg),'Ø')+chip(rec&&rec[1]!=null?fmt(rec[1]):'–','Bestwert')}</div>${line(g,s)}${dist(g,s)}</div>`}).join('');
+ });
+ const [top,games]=body.split('@@GAMES@@');
+ return `<div class="card"><h2>Dashboard: ${esc(nick)}<small>nur Historie bis gestern, keine Lösungen</small></h2>${top}</div>${games?`<div class="card"><h2>Spiele</h2>${games}</div>`:''}`;
 }
 
 /* --- Tagesranking --- */
