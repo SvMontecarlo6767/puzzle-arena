@@ -13,14 +13,14 @@ const FBCFG={
 };
 const EMOJIS=['👏','🔥','😮','😂','💀'];
 const DEFAULT_LINKS={ner:'https://nerdlegame.com',glo:'https://globle-game.com',tra:'https://travle.earth',tim:'https://timeguessr.com',kri:'https://krillion.io',satl:'https://satle.ca',rsq:'https://rangesqueeze.com',fla:'https://flagle-game.com/daily',geo:'https://geotrivia.com/de/georankle',hm:'https://howmanydaily.com',ff:'https://farflung.game',blf:'https://www.bluffer.lol/herald.html',mpt:'https://maptap.gg'};
-const TABS=[['me','🧩 Mein Tracker'],['board','🏆 Rangliste'],['rank','📅 Tagesranking'],['duel','⚔️ Duell'],['feed','💬 Feed'],['group','👥 Gruppe']];
+const TABS=[['me','🧩 Mein Tracker'],['board','🏆 Rangliste'],['rank','📅 Tagesranking'],['games','🎮 Spiele'],['games','🎮 Spiele'],['duel','⚔️ Duell'],['feed','💬 Feed'],['group','👥 Gruppe']];
 
 firebase.initializeApp(FBCFG);
 const auth=firebase.auth(),fs=firebase.firestore();
 window.__FS=fs;
 
 const A={user:null,uid:null,member:null,members:{},pubM:{},pubDays:{},pubSubs:{},pubReady:false,ver:{},cache:{},feed:[],
- tab:'me',booted:false,subs:[],rankDate:null,board:'rating',duel:{opp:null,per:'30'},profile:null,feedMine:false,threads:{},
+ game:null,gsort:'avg',tab:'me',booted:false,subs:[],rankDate:null,board:'week',cmp:'all',duel:{opp:null,per:'30'},profile:null,feedMine:false,threads:{},
  links:{},meDays:null,meDirty:true,pending:null,authMode:'login'};
 
 const $g=id=>document.getElementById(id);
@@ -248,9 +248,11 @@ function summary(uid){
   const gs={};
   G.forEach(g=>{const st=stats(g);
    gs[g.id]={played:st.played,wins:st.wins,avg:st.avg,bt:st.bt,rate:g.win&&st.played?st.wins/st.played:null,rating:tl.current[g.id]!=null?tl.current[g.id]:null}});
-  return{rating:last?last.overall:null,series:tl.overallSeries,calib:Object.keys(tl.current).length,dp,dates,gs};
+  const dc=computeDopamineCtx(),dper={};G.forEach(g=>{dper[g.id]=dc.perGame[g.id].sumTotal});
+  const dday={};dc.daySeries.forEach(x=>{dday[x.date]=x.delta});
+  return{rating:last?last.overall:null,series:tl.overallSeries,calib:Object.keys(tl.current).length,dp,dates,gs,dop:{total:dc.totalAll,per:dper,day:dday}};
  });
- s.streak=streakOf(s.dates);
+ s.streak=streakOf(s.dates);{const k=Object.keys(s.dp);const all=k.length?k.reduce((a,d)=>a+s.dp[d],0)/k.length:null,f7=avgLast(s.dp,7);s.trend=(k.length>=8&&all!=null&&f7!=null)?f7-all:null;s.f7=f7;s.fall=all}
  A.cache[uid]={v,s};return s;
 }
 const avgLast=(dp,n)=>{const k=Object.keys(dp).sort().slice(-n);return k.length?k.reduce((a,d)=>a+dp[d],0)/k.length:null};
@@ -283,18 +285,27 @@ function boardFor(date,g){
  arr.forEach(r=>{r.rank=1+arr.filter(x=>x.k>r.k).length});
  return arr;
 }
-function periodStats(from,to){
- const out={};Object.keys(A.members).forEach(u=>out[u]={pts:0,wins:0,games:0});
+function periodAll(from,to){
+ const tot={},per={};
+ Object.keys(A.members).forEach(u=>tot[u]={pts:0,wins:0,games:0});
+ G.forEach(g=>{per[g.id]={};Object.keys(A.members).forEach(u=>per[g.id][u]={pts:0,wins:0,games:0})});
  for(let d=from;d<=to;d=ad(d,1)){
   G.forEach(g=>{
    const b=boardFor(d,g);if(b.length<2)return;
    b.filter(r=>!r.np).forEach(r=>{
-    const worse=b.filter(x=>x.k<r.k).length,tie=b.filter(x=>x.k===r.k&&x!==r).length;
-    out[r.uid].pts+=worse+tie*0.5;out[r.uid].games++;if(r.rank===1)out[r.uid].wins++;
+    const worse=b.filter(x=>x.k<r.k).length,tie=b.filter(x=>x.k===r.k&&x!==r).length,pts=worse+tie*0.5,w=r.rank===1?1:0;
+    [tot[r.uid],per[g.id][r.uid]].forEach(o=>{o.pts+=pts;o.games++;o.wins+=w});
    });
   });
  }
- return out;
+ return{tot,per};
+}
+const periodStats=(from,to)=>periodAll(from,to).tot;
+function rangeFrom(mode,t){
+ if(mode==='week')return mondayOf(t);
+ if(mode==='month')return t.slice(0,8)+'01';
+ let first=t;Object.keys(A.members).forEach(u=>{const k=Object.keys(daysOf(u)).sort()[0];if(k&&k<first)first=k});
+ return first;
 }
 
 /* ============ Rendering ============ */
@@ -325,7 +336,7 @@ function showTab(t){
 }
 function renderView(){
  if(A.tab==='me'||typeof D==='undefined')return;
- const v=$g('paView'),fn={board:viewBoard,rank:viewRank,duel:viewDuel,feed:viewFeed,group:viewGroup}[A.tab];
+ const v=$g('paView'),fn={board:viewBoard,rank:viewRank,games:viewGames,duel:viewDuel,feed:viewFeed,group:viewGroup}[A.tab];
  if(!fn)return;
  try{v.innerHTML=fn()}catch(e){console.error(e);v.innerHTML='<div class="card hint">Anzeige-Fehler: '+esc(e.message)+'</div>'}
  if(A.tab==='feed')renderBar();
@@ -340,15 +351,15 @@ function leagueBadge(r){
 }
 function viewBoard(){
  const t=todayIso(),uids=Object.keys(A.members);
- if(!['week','month','all'].includes(A.board))A.board='week';
+ if(!['week','month','all','dop'].includes(A.board))A.board='week';
  const mode=A.board;
- let first=t;uids.forEach(u=>{const k=Object.keys(daysOf(u)).sort()[0];if(k&&k<first)first=k});
- const from={week:mondayOf(t),month:t.slice(0,8)+'01',all:first}[mode];
+ if(mode==='dop')return viewDop(uids,t);
+ const from=rangeFrom(mode,t);
  const ps=periodStats(from,t);
  const rows=uids.map(uid=>({uid,x:ps[uid]})).sort((a,b)=>b.x.pts-a.x.pts||b.x.wins-a.x.wins);
  const info={week:'Mo bis heute',month:'dieser Monat',all:'seit dem ersten Eintrag'}[mode];
  let h=`<div class="card"><h2>Rangliste<small>${info}</small></h2>
-  <div class="tools"><button data-board="week" class="${mode==='week'?'on':''}">Woche</button><button data-board="month" class="${mode==='month'?'on':''}">Monat</button><button data-board="all" class="${mode==='all'?'on':''}">Gesamt</button></div>
+  <div class="tools"><button data-board="week" class="${mode==='week'?'on':''}">Woche</button><button data-board="month" class="${mode==='month'?'on':''}">Monat</button><button data-board="all" class="${mode==='all'?'on':''}">Gesamt</button><button data-board="dop" class="${mode==='dop'?'on':''}">🧠 Dopamin</button></div>
   <div class="hint" style="margin-bottom:6px">Punkte: pro Spiel und Tag 1 Punkt für jeden Mitspieler, den du schlägst (Gleichstand 0,5). Nicht gespielt = Letzter, ohne Punkte.</div>`;
  h+=rows.map((r,i)=>`<div class="paRow paClick ${r.uid===A.uid?'me':''}" data-prof="${r.uid}">
    <div class="paRk">${medal(i+1)}</div>
@@ -359,13 +370,41 @@ function viewBoard(){
  else h+='<div class="hint" style="margin:0 4px 12px">Tippe auf einen Namen, um das Dashboard zu sehen.</div>';
  return h;
 }
+function viewDop(uids,t){
+ const rows=uids.map(u=>{const s=summary(u),d=s.dop;
+  const sum=n=>{let x=0;for(let i=0;i<n;i++)x+=d.day[ad(t,-i)]||0;return x};
+  return{uid:u,total:d.total,today:d.day[t]||0,w7:sum(7)}}).sort((a,b)=>b.total-a.total);
+ let h=`<div class="card"><h2>Rangliste<small>wer hat am meisten Dopamin?</small></h2>
+  <div class="tools"><button data-board="week">Woche</button><button data-board="month">Monat</button><button data-board="all">Gesamt</button><button data-board="dop" class="on">🧠 Dopamin</button></div>
+  <div class="hint" style="margin-bottom:6px">Dopamin-Punkte aus dem Tracker: Punkte pro Ergebnis, Highscores und Abzüge für ✗. Wer mehr spielt, sammelt mehr.</div>`;
+ h+=rows.map((r,i)=>{const rk=dopRankOf(r.total).cur;
+  return `<div class="paRow paClick ${r.uid===A.uid?'me':''}" data-prof="${r.uid}"><div class="paRk">${medal(i+1)}</div>
+   <div class="paMain"><div class="paNm">${esc(nickOf(r.uid))}${r.uid===A.uid?' <small>(du)</small>':''}</div><div class="hint">${rk.icon} ${esc(rk.n)} · heute ${r.today>=0?'+':''}${Math.round(r.today)} · 7 Tage ${r.w7>=0?'+':''}${Math.round(r.w7)}</div></div>
+   <div class="paBig">${Math.round(r.total).toLocaleString('de-DE')}</div></div>`}).join('')+'</div>';
+ if(A.profile&&A.members[A.profile])h+=profileHTML(A.profile);
+ return h;
+}
+function viewGames(){
+ const t=todayIso(),uids=Object.keys(A.members),mode=A.cmp,from=rangeFrom(mode,t),pa=periodAll(from,t);
+ let h=`<div class="card"><h2>Spiele-Vergleich<small>wer ist bei welchem Spiel am besten?</small></h2>
+  <div class="tools"><button data-cmp="week" class="${mode==='week'?'on':''}">Woche</button><button data-cmp="month" class="${mode==='month'?'on':''}">Monat</button><button data-cmp="all" class="${mode==='all'?'on':''}">Gesamt</button></div>
+  <div class="hint">Sortiert nach Punkten aus den Direktvergleichen. Ø, Bestwert und Dopamin gelten über alle Einträge.</div></div>`;
+ G.forEach(g=>{
+  const sums=uids.map(u=>({u,s:summary(u).gs[g.id],d:summary(u).dop.per[g.id],x:pa.per[g.id][u]}));
+  if(!sums.some(r=>r.s.played>0))return;
+  sums.sort((a,b)=>b.x.pts-a.x.pts||b.x.wins-a.x.wins||(b.s.played-a.s.played));
+  h+=`<div class="card"><h2>${esc(g.n)}${linkHTML(g.id)}${g.active===false?' <small>(inaktiv)</small>':''}</h2><div class="scroll"><table class="paTbl"><tr><th></th><th>Name</th><th>Pkt</th><th>Siege</th><th>Ø</th><th>Best</th><th>🧠</th></tr>`+
+   sums.map((r,i)=>`<tr class="${r.u===A.uid?'paMeRow':''}"><td>${medal(i+1)}</td><td>${esc(nickOf(r.u))}</td><td><b>${fmt(r.x.pts)}</b></td><td>${r.x.wins}</td><td>${r.s.played?fmt(r.s.avg):'–'}</td><td>${r.s.played?fmt(r.s.bt):'–'}</td><td>${r.s.played?Math.round(r.d):'–'}</td></tr>`).join('')+'</table></div></div>';
+ });
+ return h;
+}
 function profileHTML(uid){
  const t=todayIso(),all=daysOf(uid),hist={};
- Object.keys(all).forEach(d=>{if(d<t)hist[d]=all[d]});
+ Object.keys(all).forEach(d=>{hist[d]=all[d]});
  const nick=nickOf(uid);
  const body=withData(hist,()=>{
   const days=Object.keys(D).sort();
-  if(!days.length)return '<div class="hint">Noch keine Historie (heutige Einträge sind verborgen).</div>';
+  if(!days.length)return '<div class="hint">Noch keine Einträge.</div>';
   const ST=G.map(g=>[g,stats(g)]);
   let played=0,wins=0,wp=0;ST.forEach(([g,s])=>{played+=s.played;if(g.win){wins+=s.wins;wp+=s.played}});
   const full=days.filter(d=>GA.every(g=>D[d][g.id])).length;
@@ -383,14 +422,14 @@ function profileHTML(uid){
   h+=`<h3>Tagesform</h3><div class="chips">${chip(fmt(avgAll),'Ø aller Tage')+chip(fmt(f7),'Ø 7 Tage')+chip(bestDay?fd(bestDay.d)+' ('+fmt(bestDay.p)+')':'–','Bester Tag')}</div>${dayLine(dp)}`;
   h+=`<h3>Form aktuell</h3>${radarChart()}<h3>Wochentage</h3>${weekdayBars()}`;
   const dd=[];for(let i=27;i>=0;i--)dd.push(ad(t,-i));
-  h+=`<h3>Aktivität (letzte 28 Tage, ohne heute)</h3><div class="paAct">${dd.map(d=>{const n=D[d]?Object.keys(D[d]).length:0;return `<i title="${fd(d)}: ${n} Spiele" style="${n?`background:var(--ac);opacity:${Math.min(1,.25+n*.1)}`:''}"></i>`}).join('')}</div>`;
+  h+=`<h3>Aktivität (letzte 28 Tage)</h3><div class="paAct">${dd.map(d=>{const n=D[d]?Object.keys(D[d]).length:0;return `<i title="${fd(d)}: ${n} Spiele" style="${n?`background:var(--ac);opacity:${Math.min(1,.25+n*.1)}`:''}"></i>`}).join('')}</div>`;
   return h+'@@GAMES@@'+ST.filter(([g,s])=>s.played>0).map(([g,s])=>{
    const rec=records().find(r=>r[0].id===g.id);
    return `<div class="paGame"><h3>${esc(g.n)}${linkHTML(g.id)}${g.active===false?' <small>(inaktiv)</small>':''}</h3>
    <div class="chips">${chip(s.played,'Gespielt')+chip(fmt(s.avg),'Ø')+chip(rec&&rec[1]!=null?fmt(rec[1]):'–','Bestwert')}</div>${line(g,s)}${dist(g,s)}</div>`}).join('');
  });
  const [top,games]=body.split('@@GAMES@@');
- return `<div class="card"><h2>Dashboard: ${esc(nick)}<small>nur Historie bis gestern, keine Lösungen</small></h2>${top}</div>${games?`<div class="card"><h2>Spiele</h2>${games}</div>`:''}`;
+ return `<div class="card"><h2>Dashboard: ${esc(nick)}<small>nur Ergebnisse, keine Lösungen</small></h2>${top}</div>${games?`<div class="card"><h2>Spiele</h2>${games}</div>`:''}`;
 }
 
 /* --- Tagesranking --- */
@@ -426,6 +465,45 @@ function viewRank(){
      <div class="paBig sm">${esc(valText(g,r.e))}</div></div>${reactionBar(r.uid,d,g)}</div>`).join('')+'</div>';
  });
  if(!any)h+='<div class="card hint">Für diesen Tag hat noch niemand etwas eingetragen.</div>';
+ return h;
+}
+
+/* --- Spiele-Vergleich --- */
+function viewGames(){
+ const uids=Object.keys(A.members),sums={};uids.forEach(u=>sums[u]=summary(u));
+ const withData_=g=>uids.some(u=>sums[u].gs[g.id].played>0);
+ const gl=G.filter(withData_);
+ if(!A.game||!gl.some(g=>g.id===A.game))A.game=(gl[0]||{}).id;
+ const g=G.find(x=>x.id===A.game);
+ let h='';
+ if(g){
+  const rows=uids.filter(u=>sums[u].gs[g.id].played>0).map(u=>({u,x:Object.assign({},sums[u].gs[g.id],{dop:sums[u].dop.per[g.id]||0})}));
+  const sk=A.gsort,dirLow=g.dir==='low';
+  const key={avg:r=>r.x.avg==null?null:(dirLow?-r.x.avg:r.x.avg),best:r=>r.x.bt==null?null:(dirLow?-r.x.bt:r.x.bt),rate:r=>r.x.rate,dop:r=>r.x.dop,played:r=>r.x.played}[sk];
+  rows.sort((a,b)=>{const x=key(a),y=key(b);return (y==null?-1e18:y)-(x==null?-1e18:x)});
+  h+=`<div class="card"><h2>Spiele-Vergleich${linkHTML(g.id)}</h2><select id="paGameSel">${gl.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${esc(x.n)}</option>`).join('')}</select>
+   <div class="tools" style="margin-top:8px">${[['avg','Ø'],['best','Bestwert'],['rate','Quote'],['dop','Dopamin'],['played','Gespielt']].map(([k,l])=>`<button data-gsort="${k}" class="${sk===k?'on':''}">${l}</button>`).join('')}</div>
+   <div class="scroll"><table class="paTbl"><tr><th></th><th>Spieler</th><th>Ø</th><th>Best</th><th>Quote</th><th>Dopamin</th><th>Gesp.</th></tr>`+
+   rows.map((r,i)=>`<tr class="${r.u===A.uid?'paMeRow':''}"><td>${medal(i+1)}</td><td>${esc(nickOf(r.u))}</td><td>${fmt(r.x.avg)}</td><td>${fmt(r.x.bt)}</td><td>${r.x.rate==null?'–':Math.round(r.x.rate*100)+' %'}</td><td>${r.x.dop}</td><td>${r.x.played}</td></tr>`).join('')+
+   `</table></div><div class="hint" style="margin-top:6px">${dirLow?'Niedrigerer Wert ist besser.':g.dir==='high'?'Höherer Wert ist besser.':''} Alle Einträge, auch heute.</div></div>`;
+ }
+ // Champions
+ const champs=gl.map(x=>{
+  const c=uids.map(u=>({u,a:sums[u].gs[x.id]})).filter(r=>r.a.played>=3&&r.a.avg!=null);
+  if(c.length<2)return null;
+  c.sort((p,q)=>x.dir==='low'?p.a.avg-q.a.avg:q.a.avg-p.a.avg);return[x,c[0]];
+ }).filter(Boolean);
+ if(champs.length)h+=`<div class="card"><h2>Bester je Spiel<small>nach Ø, mind. 3 Einträge</small></h2>`+champs.map(([x,c])=>`<div class="paRow"><div class="paMain"><div class="paNm">${esc(x.n)}${linkHTML(x.id)}</div></div><div class="paNm">🥇 ${esc(nickOf(c.u))}</div><div class="paBig sm">${fmt(c.a.avg)}</div></div>`).join('')+'</div>';
+ // Dopamin
+ const dopT=u=>sums[u].dop.total||0;
+ const dop=[...uids].sort((a,b)=>dopT(b)-dopT(a));
+ h+=`<div class="card"><h2>Dopamin<small>wer hat am meisten gefarmt</small></h2>`+dop.map((u,i)=>{const r=[...DOP_RANKS].reverse().find(x=>dopT(u)>=x.th)||DOP_RANKS[0];
+  return `<div class="paRow ${u===A.uid?'me':''}"><div class="paRk">${medal(i+1)}</div><div class="paMain"><div class="paNm">${esc(nickOf(u))}${u===A.uid?' <small>(du)</small>':''}</div><div class="hint">${r.icon} ${esc(r.n)}</div></div><div class="paBig">${Math.round(dopT(u)).toLocaleString('de-DE')}</div></div>`}).join('')+'</div>';
+ // Aufsteiger
+ const up=[...uids].sort((a,b)=>(sums[b].trend==null?-1e9:sums[b].trend)-(sums[a].trend==null?-1e9:sums[a].trend));
+ h+=`<div class="card"><h2>Aufsteiger<small>Tagesform der letzten 7 Tage minus Ø aller Tage</small></h2>`+up.map((u,i)=>{const x=sums[u];
+  return `<div class="paRow ${u===A.uid?'me':''}"><div class="paRk">${x.trend==null?'–':medal(i+1)}</div><div class="paMain"><div class="paNm">${esc(nickOf(u))}${u===A.uid?' <small>(du)</small>':''}</div><div class="hint">7 Tage ${fmt(x.f7)} % · alle Tage ${fmt(x.fall)} %</div></div><div class="paBig ${x.trend>0?'paW':''}">${x.trend==null?'–':(x.trend>=0?'+':'')+fmt(x.trend)}</div></div>`}).join('')+
+  '<div class="hint" style="margin-top:6px">Ab 8 Tagen mit Einträgen. Tagesform ist relativ zur eigenen Historie, so zählt echte Verbesserung.</div></div>';
  return h;
 }
 
@@ -513,6 +591,8 @@ document.addEventListener('click',async ev=>{
  if((b=t.closest('[data-board]'))){A.board=b.dataset.board;renderView();return}
  if((b=t.closest('[data-prof]'))){A.profile=b.dataset.prof;if(A.tab!=='board'){showTab('board')}else renderView();window.scrollTo(0,0);return}
  if((b=t.closest('[data-rd]'))){const n=+b.dataset.rd;A.rankDate=n===0?todayIso():ad(A.rankDate||todayIso(),n);renderView();return}
+ if((b=t.closest('[data-cmp]'))){A.cmp=b.dataset.cmp;renderView();return}
+ if((b=t.closest('[data-gsort]'))){A.gsort=b.dataset.gsort;renderView();return}
  if((b=t.closest('[data-dper]'))){A.duel.per=b.dataset.dper;renderView();return}
  if((b=t.closest('[data-feed]'))){A.feedMine=b.dataset.feed==='mine';renderView();return}
  if((b=t.closest('[data-thread]'))){const k=b.dataset.thread;A.threads[k]=!A.threads[k];renderView();return}
@@ -545,6 +625,7 @@ document.addEventListener('click',async ev=>{
 });
 document.addEventListener('change',ev=>{
  const t=ev.target;
+ if(t.id==='paGameSel'){A.game=t.value;renderView()}
  if(t.id==='paOpp'){A.duel.opp=t.value;renderView()}
  if(t.id==='paRankDate'&&t.value){A.rankDate=t.value;renderView()}
 });

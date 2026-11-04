@@ -37,3 +37,5 @@ select{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:
 .paLink{font-size:13px;text-decoration:none;color:var(--ac);border:1px solid var(--bd);border-radius:8px;padding:0 6px;margin-left:6px;font-weight:600}
 .paLinkRow{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;margin:4px 0;font-size:13px}
 .paGame{border-top:1px solid var(--bd);padding-top:4px;margin-top:6px}.paGame:first-of-type{border-top:0;margin-top:0}
+.paMeRow{background:var(--ac2)}
+.paMeRow td{background:var(--ac2)}

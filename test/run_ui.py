@@ -47,13 +47,14 @@ with sync_playwright() as p:
     s=json.dumps(store[pub[0]]); print('pub contains GEHEIM?', 'GEHEIM' in s, '| Frankreich?', 'Frankreich' in s, '| fermi?', '"fermi"' in s)
     priv=[k for k in store if k.startswith('users/')]; print('private docs', len(priv), 'note stored privately:', 'GEHEIM' in json.dumps([store[k] for k in priv]))
     pg.screenshot(path='/tmp/s_me.png')
-    for tab,name in [('board','board'),('rank','rank'),('duel','duel'),('feed','feed'),('group','group')]:
+    for tab,name in [('board','board'),('games','games'),('rank','rank'),('duel','duel'),('feed','feed'),('group','group')]:
         pg.click(f'[data-tab={tab}]'); pg.wait_for_timeout(500)
         if tab=='rank':
             pg.click('[data-react="1"]'); pg.wait_for_timeout(300)
             pg.click('[data-thread]'); pg.wait_for_timeout(200)
             pg.fill('[data-cin]','Starker Wert!'); pg.press('[data-cin]','Enter'); pg.wait_for_timeout(500)
         if tab=='board':
+            pg.click('[data-board=dop]'); pg.wait_for_timeout(300); print(pg.inner_text('#paView')[:330].replace('\n',' | '))
             pg.click('[data-prof="u_momo"]'); pg.wait_for_timeout(400)
         pg.screenshot(path=f'/tmp/s_{name}.png',full_page=True)
         ov=pg.evaluate("document.documentElement.scrollWidth>document.documentElement.clientWidth+1")
