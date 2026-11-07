@@ -655,6 +655,7 @@ function importDay(raw){
  let o;try{o=JSON.parse(raw)}catch(e){throw new Error('Das ist kein gültiger Export.')}
  const list=Array.isArray(o)?o:[o];
  if(!list.length||!list.every(x=>x&&x.pa==='day'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&x.day&&typeof x.day==='object'))throw new Error('Das ist kein Tages-Export aus dem Artefakt.');
+ list.forEach(x=>{Object.keys(x.day).forEach(k=>{if(k!=='note'&&!G.some(g=>g.id===k))delete x.day[k]})});
  list.forEach(x=>{D[x.date]=Object.assign(JSON.parse(JSON.stringify(D[x.date]||{})),JSON.parse(JSON.stringify(x.day)));if(!Object.keys(D[x.date]).length)delete D[x.date]});
  mig();save(list.map(x=>x.date));
  cur=list[list.length-1].date;const di=document.getElementById('date');if(di)di.value=cur;
