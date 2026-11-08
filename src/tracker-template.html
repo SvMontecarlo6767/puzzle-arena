@@ -719,14 +719,14 @@ const chip=(v,l)=>`<div class="chip"><b>${v}</b><span>${l}</span></div>`;
 const dayDiff=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
 
 function line(g,S){
- const pts=S.es.slice(-30);
+ const pts=S.es,rr=pts.length>150?1.6:pts.length>70?2.2:3,rf=pts.length>150?2.4:pts.length>70?3:4;
  if(pts.length<2)return '<div class="hint">Für den Verlauf braucht es mindestens 2 Einträge.</div>';
  const W=300,H=100,p=10,vals=pts.map(e=>e.n).filter(v=>v!=null);
  if(!vals.length){
   const X=i=>p+i*(W-2*p)/(pts.length-1),midY=H/2;
   return `<svg viewBox="0 0 ${W} ${H}"><polyline points="${pts.map((e,i)=>X(i)+','+midY).join(' ')}" fill="none" style="stroke:var(--bad)" stroke-width="2" stroke-dasharray="3 3"/>
-  ${pts.map((e,i)=>`<circle class="pt" data-label="${e.d.split('-').reverse().join('.')}" data-v="✗" cx="${X(i)}" cy="${midY}" r="4" style="fill:var(--bad)"/>`).join('')}</svg>
-  <div class="hint">Letzte ${pts.length} Einträge · alles ✗ · auf Punkt tippen für Details</div>`}
+  ${pts.map((e,i)=>`<circle class="pt" data-label="${e.d.split('-').reverse().join('.')}" data-v="✗" cx="${X(i)}" cy="${midY}" r="${rf}" style="fill:var(--bad)"/>`).join('')}</svg>
+  <div class="hint">${pts.length} Einträge im gewählten Zeitraum · alles ✗ · auf Punkt tippen für Details</div>`}
  let mn=Math.min(...vals),mx=Math.max(...vals);if(mn===mx){mn-=1;mx+=1}
  const lane=22,plotTop=p,plotBot=H-p-lane,lowBetter=g.dir==='low',scale=(plotBot-plotTop)/(mx-mn);
  const X=i=>p+i*(W-2*p)/(pts.length-1);
@@ -744,9 +744,9 @@ function line(g,S){
  <line x1="${p}" x2="${W-p}" y1="${sepY}" y2="${sepY}" style="stroke:var(--bd)" stroke-width="1"/>
  ${rollPts.length>1?`<polyline points="${rollPts.map(q=>q.join(',')).join(' ')}" fill="none" style="stroke:var(--ac)" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/>`:''}
  <polyline points="${ok.map(q=>q[0]+','+q[1]).join(' ')}" fill="none" style="stroke:var(--ac)" stroke-width="2"/>
- ${ok.map(q=>q[2]?`<circle class="pt" data-label="${q[3].split('-').reverse().join('.')}" data-v="✗" cx="${q[0]}" cy="${q[1]}" r="4" style="fill:var(--bad)"/>`:`<circle class="pt" data-label="${q[3].split('-').reverse().join('.')}" data-v="${f(q[4])}" cx="${q[0]}" cy="${q[1]}" r="3" style="fill:var(--ac)"/>`).join('')}
+ ${ok.map(q=>q[2]?`<circle class="pt" data-label="${q[3].split('-').reverse().join('.')}" data-v="✗" cx="${q[0]}" cy="${q[1]}" r="${rf}" style="fill:var(--bad)"/>`:`<circle class="pt" data-label="${q[3].split('-').reverse().join('.')}" data-v="${f(q[4])}" cx="${q[0]}" cy="${q[1]}" r="${rr}" style="fill:var(--ac)"/>`).join('')}
  <text x="${p}" y="9" font-size="9" style="fill:var(--mu);pointer-events:none">${topLbl}</text><text x="${p}" y="${plotBot+4}" font-size="9" style="fill:var(--mu);pointer-events:none">${botLbl}</text><text x="${W-p}" y="${failY+3}" text-anchor="end" font-size="9" style="fill:var(--bad);pointer-events:none">✗</text></svg>
- <div class="hint">Letzte ${pts.length} Einträge · gestrichelt (grob) = Ø${g.dir==='low'?' · oben = besser (tieferer Wert)':g.dir==='high'?' · oben = besser (höherer Wert)':''} · gestrichelt (fein) = 7er-Trend · rote Zone unten = ✗ · auf Punkt tippen für Details</div>`}
+ <div class="hint">${pts.length} Einträge im gewählten Zeitraum · gestrichelt (grob) = Ø${g.dir==='low'?' · oben = besser (tieferer Wert)':g.dir==='high'?' · oben = besser (höherer Wert)':''} · gestrichelt (fein) = 7er-Trend · rote Zone unten = ✗ · auf Punkt tippen für Details</div>`}
 function dist(g,S){
  if(!g.max||g.max>12)return '';
  const c={};let fails=S.es.filter(e=>e.w===0).length;
@@ -772,18 +772,18 @@ function dayStats(){
  return pts}
 function dayLine(pts){
  if(pts.length<2)return '<div class="hint">Für den Vergleich braucht es mindestens 2 Tage mit Einträgen.</div>';
- const last=pts.slice(-30),W=300,H=110,p=10;
+ const last=pts,W=300,H=110,p=10,rr=last.length>150?1.6:last.length>70?2.2:3;
  const avg=pts.reduce((a,b)=>a+b.p,0)/pts.length;
  const X=i=>p+i*(W-2*p)/(Math.max(1,last.length-1)),Y=v=>p+(100-v)*(H-2*p-12)/100;
  const ok=last.map((e,i)=>[X(i),Y(e.p)]);
  const roll=pts.map((e,i)=>{const w=pts.slice(Math.max(0,i-6),i+1);return w.reduce((a,x)=>a+x.p,0)/w.length});
- const rollLast=roll.slice(-30),rk=rollLast.map((v,i)=>[X(i),Y(v)]);
+ const rollLast=roll,rk=rollLast.map((v,i)=>[X(i),Y(v)]);
  return `<svg viewBox="0 0 ${W} ${H}"><line x1="${p}" x2="${W-p}" y1="${Y(avg)}" y2="${Y(avg)}" style="stroke:var(--mu)" stroke-dasharray="4 4" stroke-width="1"/>
  <polyline points="${rk.map(q=>q.join(',')).join(' ')}" fill="none" style="stroke:var(--ac)" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/>
  <polyline points="${ok.map(q=>q.join(',')).join(' ')}" fill="none" style="stroke:var(--ac)" stroke-width="2"/>
- ${ok.map((q,i)=>`<circle class="pt" data-label="${last[i].d.split('-').reverse().join('.')}" data-v="${f(last[i].p)}" cx="${q[0]}" cy="${q[1]}" r="3" style="fill:var(--ac)" data-d="${last[i].d}"/>`).join('')}
+ ${ok.map((q,i)=>`<circle class="pt" data-label="${last[i].d.split('-').reverse().join('.')}" data-v="${f(last[i].p)}" cx="${q[0]}" cy="${q[1]}" r="${rr}" style="fill:var(--ac)" data-d="${last[i].d}"/>`).join('')}
  <text x="${p}" y="9" font-size="9" style="fill:var(--mu);pointer-events:none">100</text><text x="${p}" y="${H-14}" font-size="9" style="fill:var(--mu);pointer-events:none">0</text></svg>
- <div class="hint">Letzte ${last.length} Tage mit Einträgen · 0–100, gestrichelt (fein) = 7-Tage-Trend, gestrichelt (grob) = Ø aller Tage · höher = insgesamt besser · auf Punkt tippen für Details, antippen springt zum Tag</div>`}
+ <div class="hint">${last.length} Tage mit Einträgen im gewählten Zeitraum · 0–100, gestrichelt (fein) = 7-Tage-Trend, gestrichelt (grob) = Ø aller Tage · höher = insgesamt besser · auf Punkt tippen für Details, antippen springt zum Tag</div>`}
 
 function gameRankInfo(g,d){
  const e=D[d]&&D[d][g.id];if(!e)return null;
